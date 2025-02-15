@@ -44,20 +44,19 @@ struct ContentView: View {
     
     @State var results: [Address] = [] // 検索結果を入れる配列
     @State private var searchText = "" // テキストフィールドに入力した値を入れる変数
+    @State private var isPresented = false // アラートの表示・非表示を管理
+    @State private var isEmpty = false // 検索結果の住所の有無を管理
+    @FocusState private var isFocused: Bool  // キーボードのフォーカスを管理(閉じるため)
     
     var body: some View {
         VStack {
-            // APIリクエストテスト用ボタン
-            Button {
-                requestAddressFromZipcode(zipcode: searchText)
-            } label: {
-                Text("検索")
-            }
             // 検索したい郵便番号を入力するフィールド
             TextField("検索したい郵便番号を入力", text: $searchText)
                 .padding(8)
                 .border(.gray, width: 3)
                 .padding()
+                .keyboardType(.numberPad)
+                .focused($isFocused) // フォーカス管理の変数を登録
 
                 // キーボードの上部に検索ボタン設置
                 .toolbar {
@@ -66,8 +65,16 @@ struct ContentView: View {
                         // 検索ボタン
                         Button {
                             requestAddressFromZipcode(zipcode: searchText)
+                            isFocused = false // リクエスト送信したらキーボード閉じる
                         } label: {
                             Text("\(Image(systemName: "magnifyingglass")) 検索")
+                        }
+                        
+                        // アラート
+                        .alert("Error !", isPresented: $isPresented) {
+                            Button("OK", role: .cancel) {}
+                        } message: {
+                            Text("数字を7文字入力してください。")
                         }
                     }
                 }
@@ -79,10 +86,21 @@ struct ContentView: View {
             }
         }
         .padding()
+        // TextField以外をタップしてもフォーカスが外れる(キーボードが閉じる)ようにする
+        .onTapGesture {
+            isFocused = false
+        }
     }
     
     // リクエスト送信用のメソッド
     func requestAddressFromZipcode(zipcode: String) {
+        // 正規表現で数字7文字かチェックする
+        if !isZipcode(enteredText: zipcode) {
+            // チェックに引っかかったらアラートを表示
+            isPresented = true
+            return
+        }
+
         //リクエストに含ませるパラメータを用意(中身は検索する郵便番号)
         let parameters: [String: Any] = ["zipcode": zipcode]
         //Alamofireを使ってリクエストを送信
@@ -107,6 +125,14 @@ struct ContentView: View {
                 print(error)
             }
         }
+    }
+    
+    // 正規業源で数字7文字かチェックする関数
+    func isZipcode(enteredText: String) -> Bool {
+        let pattern = "^[0-9]{7}$"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return false } // NSRegularExpressionをインスタンス化
+        let matches = regex.matches(in: enteredText, range: NSRange(location: 0, length: enteredText.count)) // パターンマッチを確認
+        return matches.count == 1 ? true : false  // 結果によって真偽値を返す
     }
 }
 
